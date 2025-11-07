@@ -169,6 +169,14 @@ function memoized_git_ref_to_info() {
 					url="${gitlab_path}/-/raw/${sha1}/Makefile"
 					;;
 
+				"https://codeberg.org/"*)
+					# Codeberg runs Forgejo; its raw endpoint mirrors GitHub-style URLs.
+					declare org_and_repo=""
+					org_and_repo="$(echo "${git_source}" | cut -d/ -f4-5)"
+					org_and_repo="${org_and_repo%.git}" # remove .git if present
+					url="https://codeberg.org/${org_and_repo}/raw/commit/${sha1}/Makefile"
+					;;
+
 				*)
 					exit_with_error "Unknown git source '${git_source}'"
 					;;
