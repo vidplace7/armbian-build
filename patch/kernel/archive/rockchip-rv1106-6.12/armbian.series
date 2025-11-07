@@ -1,0 +1,12 @@
+# Series from patches.armbian/
+	patches.armbian/001-clk-rockchip-Add support for RV1106-RV1103.patch
+	patches.armbian/002-pinctrl-rockchip-Add support for RV1106-RV1103.patch
+	patches.armbian/003-iio-adc-rockchip-saradc-Add support for RV1106.patch
+	patches.armbian/004-nvmem-rockchip-otp-Add support for RV1106 SoC.patch
+	patches.armbian/005-thermal-rockchip-Add support for RV1106 SoC.patch
+	patches.armbian/006-soc-rockchip-Add support for power monitoring driver.patch
+	patches.armbian/007-phy-rockchip-inno-usb2-Add support for RV1106-RV1103.patch
+	patches.armbian/008-char-hw_random-Add support for Rockchip RNG.patch
+	patches.armbian/009-rtc-rockchip-Add support for RTC present in RV1106 SoC.patch
+	patches.armbian/010-net-phy-Add Rockchip RK630 PHY driver.patch
+	patches.armbian/011-net-ethernet-stmmac-Add support for Rockchip RV1106.patch
