@@ -1,0 +1,24 @@
+/*
+ * Disable ethernet0 for power optimization
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "rockchip,rk3506";
+
+	fragment@0 {
+		target = <&gmac0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@1 {
+		target = <&mdio0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+};
