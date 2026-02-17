@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ricardo Pardini <ricardo@pardini.net>
+Date: Fri, 30 Jun 2023 17:30:37 +0200
+Subject: use serial# as base for MAC address; find serial# first, then
+ ethaddr
+
+[Modified for rv1103/rv1106 by Austin Lane <vidplace7@gmail.com>]
+---
+diff --git a/arch/arm/mach-rockchip/board.c b/arch/arm/mach-rockchip/board.c
+index e5445af739..9886dfa1bc 100644
+--- a/arch/arm/mach-rockchip/board.c
++++ b/arch/arm/mach-rockchip/board.c
+@@ -112,6 +112,18 @@ static int rockchip_set_ethaddr(void)
+ 	char buf[ARP_HLEN_ASCII + 1], mac[16];
+ 	u8 ethaddr[ARP_HLEN * MAX_ETHERNET] = {0};
+ 	int i, ret = -EINVAL;
++	u8 serial_mac[ARP_HLEN] = {0};
++	char *serial;
++
++	/* Try to derive MAC from serial# */
++	serial = env_get("serial#");
++	if (serial) {
++		/* XOR fold serial into 6 bytes */
++		for (i = 0; serial[i] != '\0'; i++)
++			serial_mac[i % ARP_HLEN] ^= serial[i];
++		serial_mac[0] &= 0xfe;  /* clear multicast bit */
++		serial_mac[0] |= 0x02;  /* set local assignment bit (IEEE802) */
++	}
+ 
+ #ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
+ 	ret = vendor_storage_read(LAN_MAC_ID, ethaddr, sizeof(ethaddr));
+@@ -119,7 +131,10 @@ static int rockchip_set_ethaddr(void)
+ 	for (i = 0; i < MAX_ETHERNET; i++) {
+ 		if (ret <= 0 || !is_valid_ethaddr(&ethaddr[i * ARP_HLEN])) {
+ 			if (!randomed) {
+-				net_random_ethaddr(&ethaddr[i * ARP_HLEN]);
++				if (serial)
++					memcpy(&ethaddr[i * ARP_HLEN], serial_mac, ARP_HLEN);
++				else
++					net_random_ethaddr(&ethaddr[i * ARP_HLEN]);
+ 				randomed = true;
+ 			} else {
+ 				if (i > 0) {
+@@ -453,11 +468,11 @@ static void scan_run_cmd(void)
+ 
+ int board_late_init(void)
+ {
+-#ifdef CONFIG_ROCKCHIP_SET_ETHADDR
+-	rockchip_set_ethaddr();
+-#endif
+ #ifdef CONFIG_ROCKCHIP_SET_SN
+ 	rockchip_set_serialno();
++#endif
++#ifdef CONFIG_ROCKCHIP_SET_ETHADDR
++	rockchip_set_ethaddr();
+ #endif
+ 	setup_download_mode();
+ 	scan_run_cmd();

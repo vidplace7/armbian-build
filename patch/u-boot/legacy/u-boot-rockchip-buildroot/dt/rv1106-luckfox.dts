@@ -57,3 +57,12 @@
 	u-boot,dm-spl;
 	status = "okay";
 };
+
+&gmac {
+	u-boot,dm-spl;
+	status = "okay";
+};
+
+&otp {
+    u-boot,dm-pre-reloc;
+};
