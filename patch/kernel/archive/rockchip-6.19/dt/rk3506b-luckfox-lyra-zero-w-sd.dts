@@ -1,0 +1,228 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/pinctrl/rockchip.h>
+//#include <dt-bindings/display/drm_mipi_dsi.h>
+//#include <dt-bindings/display/rockchip_vop.h>
+//#include <dt-bindings/input/rk-input.h>
+//#include <dt-bindings/sensor-dev.h>
+//#include <dt-bindings/suspend/rockchip-rk3506.h>
+
+#include "rk3506.dtsi"
+
+/ {
+    model = "Luckfox Lyra Zero W";
+    compatible = "rockchip,rk3506b-luckfox-lyra-zero-w-sd", "rockchip,rk3506";
+
+    wireless_bluetooth: wireless-bluetooth {
+        compatible = "bluetooth-platdata";
+        BT,power_gpio = <&gpio1 RK_PC5 GPIO_ACTIVE_HIGH>;
+        status = "okay";
+    };
+
+    adc_keys: adc-keys {
+        compatible = "adc-keys";
+        io-channels = <&saradc 1>;
+        io-channel-names = "buttons";
+        keyup-threshold-microvolt = <1800000>;
+        poll-interval = <100>;
+    };
+
+    leds: leds {
+        compatible = "gpio-leds";
+        work_led: work-led {
+            gpios = <&gpio1 RK_PA0 GPIO_ACTIVE_HIGH>;
+            linux,default-trigger = "heartbeat";
+        };
+    };
+
+    vcc_sys: vcc-sys {
+        compatible = "regulator-fixed";
+        regulator-name = "vcc_sys";
+        regulator-always-on;
+        regulator-boot-on;
+        regulator-min-microvolt = <5000000>;
+        regulator-max-microvolt = <5000000>;
+    };
+
+    vcc_3v3: vcc-3v3 {
+        compatible = "regulator-fixed";
+        regulator-name = "vcc_3v3";
+        regulator-always-on;
+        regulator-boot-on;
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
+        vin-supply = <&vcc_sys>;
+    };
+
+    vcc_1v8: vcc-1v8 {
+        compatible = "regulator-fixed";
+        regulator-name = "vcc_1v8";
+        regulator-always-on;
+        regulator-boot-on;
+        regulator-min-microvolt = <1800000>;
+        regulator-max-microvolt = <1800000>;
+        vin-supply = <&vcc_3v3>;
+    };
+
+    /* 1.8V */
+    vcc_ddr: vcc-ddr {
+        compatible = "regulator-fixed";
+        regulator-name = "vcc_ddr";
+        regulator-always-on;
+        regulator-boot-on;
+        vin-supply = <&vcc_sys>;
+    };
+
+    vdd_0v9: vdd-0v9 {
+        compatible = "regulator-fixed";
+        regulator-name = "vdd_0v9";
+        regulator-always-on;
+        regulator-boot-on;
+        regulator-min-microvolt = <900000>;
+        regulator-max-microvolt = <900000>;
+        vin-supply = <&vcc_sys>;
+    };
+
+    vdd_cpu: vdd-cpu {
+        compatible = "regulator-fixed";
+        regulator-name = "vdd_cpu";
+        regulator-boot-on;
+        regulator-always-on;
+        regulator-min-microvolt = <500000>;
+        regulator-max-microvolt = <1500000>;
+        vin-supply = <&vdd_cpu>;
+    };
+};
+
+&cpu0 {
+	cpu-supply = <&vdd_cpu>;
+};
+
+&cpu1 {
+	cpu-supply = <&vdd_cpu>;
+};
+
+&cpu2 {
+	cpu-supply = <&vdd_cpu>;
+};
+
+&pwm0_4ch_2 {
+    pinctrl-names = "active";
+    pinctrl-0 = <&rm_io15_pwm0_ch2>;
+    status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&rm_io1_i2c2_scl &rm_io0_i2c2_sda>;
+};
+
+&pinctrl {
+	rm_io0 {
+		rm_io0_i2c2_sda: rm-io0-i2c2-sda {
+			rockchip,pins =
+				<0 RK_PA0 35 &pcfg_pull_up>;
+		};
+	};
+
+	rm_io1 {
+		rm_io1_i2c2_scl: rm-io1-i2c2-scl {
+			rockchip,pins =
+				<0 RK_PA1 34 &pcfg_pull_up>;
+		};
+	};
+};
+
+&saradc {
+    vref-supply = <&vcc_1v8>;
+    status = "okay";
+};
+
+&tsadc {
+    pinctrl-names = "gpio", "otpout";
+    pinctrl-0 = <&wdt_tsadc_gpio>;
+    pinctrl-1 = <&rm_io21_wdt_tsadc_shut>;
+    status = "okay";
+};
+
+&mmc {
+    max-frequency = <52000000>;
+    bus-width = <4>;
+    no-sdio;
+    no-mmc;
+    cap-mmc-highspeed;
+    cap-sd-highspeed;
+    cd-gpios = <&gpio1 RK_PB6 GPIO_ACTIVE_LOW>;
+    disable-wp;
+    //sd-uhs-sdr104;
+    pinctrl-names = "default";
+    pinctrl-0 = <&sdmmc_clk_pins &sdmmc_cmd_pins &sdmmc_bus4_pins &sdmmc_det &sdmmc_pwren>;
+    vqmmc-supply = <&vcc_3v3>;
+    vmmc-supply = <&vcc_3v3>;
+    status = "okay";
+};
+
+&fspi {
+    status = "okay";
+
+    flash@0 {
+        compatible = "spi-nand";
+        reg = <0>;
+        spi-max-frequency = <80000000>;
+        spi-rx-bus-width = <4>;
+        spi-tx-bus-width = <1>;
+    };
+};
+
+// &gmac1 {
+//     status = "disabled";
+// };
+
+&usb20_otg0 {
+    dr_mode = "peripheral";
+    status = "okay";
+};
+
+&usb20_otg1 {
+    dr_mode = "host";
+    status = "okay";
+};
+
+&usb2phy {
+    /* extcon = <&extcon_usb>; */
+    status = "okay";
+};
+
+&u2phy_otg0 {
+    status = "okay";
+};
+
+&u2phy_otg1 {
+    status = "okay";
+};
+
+/* Pinctrl */
+&pinctrl {
+    sdmmc {
+        /omit-if-no-ref/
+        sdmmc_pwren: sdmmc-pwren {
+            rockchip,pins = <1 RK_PB7 RK_FUNC_GPIO &pcfg_pull_down>;
+        };
+
+        sdmmc_det: sdmmc-det {
+            rockchip,pins = <1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_up>;
+        };
+    };
+
+    tsadc {
+        wdt_tsadc_gpio: wdt-tsadc-gpio {
+            rockchip,pins = <0 RK_PC5 RK_FUNC_GPIO &pcfg_pull_none>;
+        };
+    };
+};
