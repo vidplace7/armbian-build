@@ -1,0 +1,40 @@
+From 32dc0c2e9fd56fcb59f7942edf5d9632df8ef1da Mon Sep 17 00:00:00 2001
+From: Karthik M <quic_karm@quicinc.com>
+Date: Mon, 17 Apr 2023 15:32:58 +0530
+Subject: [PATCH] wifi: mac80211: Initialize EWMA fail avg to 1
+
+If the average value in mesh metrics calculation
+has been rounded to 0 (success), this resets it to
+the smallest nonzero value (similarly to the initialization)
+to avoid a case where a single failure would result in
+an average value that goes beyond the value
+of 95 (Link Failure Threshold).
+
+Signed-off-by: Tamizh Chelvam Raja <quic_tamizhr@quicinc.com>
+Signed-off-by: Karthik M <quic_karm@quicinc.com>
+---
+ net/mac80211/mesh_hwmp.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/net/mac80211/mesh_hwmp.c b/net/mac80211/mesh_hwmp.c
+index 4c371f202a4cc..9decca0fbaa59 100644
+--- a/net/mac80211/mesh_hwmp.c
++++ b/net/mac80211/mesh_hwmp.c
+@@ -304,6 +304,17 @@ void ieee80211s_update_metric(struct ieee80211_local *local,
+ 
+ 	failed = !(txinfo->flags & IEEE80211_TX_STAT_ACK);
+ 
++	if (!ewma_mesh_fail_avg_read(&sta->mesh->fail_avg)) {
++		/* If the average value in mesh metrics calculation
++		 * has been rounded to 0 (success), this resets it to
++		 * the smallest nonzero value (similarly to the initialization)
++		 * to avoid a case where a single failure would result in
++		 * an average value that goes beyond the value
++		 * of 95 (Link Failure Threshold)
++		 */
++		ewma_mesh_fail_avg_add(&sta->mesh->fail_avg, 1);
++	}
++
+ 	/* moving average, scaled to 100.
+ 	 * feed failure as 100 and success as 0
+ 	 */

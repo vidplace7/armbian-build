@@ -1,0 +1,60 @@
+From 913455e70e8f7a71860e6ed4e59159cc65971070 Mon Sep 17 00:00:00 2001
+From: Sagar Bussa <sagar.bussa@morsemicro.com>
+Date: Thu, 13 Mar 2025 20:50:20 +1100
+Subject: [PATCH] spi: support control of SPI CS pin on initialisation
+
+The Linux kernel as dropped legacy GPIO support and starting using a
+GPIO descriptor based interface for chip select line handling from
+kernel version 6.1. The Morse Micro driver requires control of the
+chip select line during intiialisation, to correctly sequence the line
+to enter SPI mode.
+
+This patch adds a bit which instructs the bus to not force the chip
+select high in during spi_setup.
+---
+ drivers/spi/spi.c       | 6 ++++--
+ include/linux/spi/spi.h | 7 +++++++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 728e1f7e4be3e..58873eee061cd 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -991,7 +991,8 @@ static void spi_set_cs(struct spi_device *spi, bool enable, bool force)
+ 				gpiod_set_value_cansleep(spi->cs_gpiod, !enable);
+ 			else
+ 				/* Polarity handled by GPIO library */
+-				gpiod_set_value_cansleep(spi->cs_gpiod, activate);
++				gpiod_set_value_cansleep(spi->cs_gpiod,
++					(spi->controller->flags & SPI_CONTROLLER_ENABLE_CS_GPIOD) ? enable : activate);
+ 		}
+ 		/* Some SPI masters need both GPIO CS & slave_select */
+ 		if ((spi->controller->flags & SPI_MASTER_GPIO_SS) &&
+@@ -3637,7 +3638,8 @@ int spi_setup(struct spi_device *spi)
+ 		return -EINVAL;
+ 
+ 	if (ctlr->use_gpio_descriptors && ctlr->cs_gpiods &&
+-	    ctlr->cs_gpiods[spi->chip_select] && !(spi->mode & SPI_CS_HIGH)) {
++	    ctlr->cs_gpiods[spi->chip_select] && !(spi->mode & SPI_CS_HIGH) &&
++	    !(ctlr->flags & SPI_CONTROLLER_ENABLE_CS_GPIOD)) {
+ 		dev_dbg(&spi->dev,
+ 			"setup: forcing CS_HIGH (use_gpio_descriptors)\n");
+ 		spi->mode |= SPI_CS_HIGH;
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index fbf8c0d95968e..7d36847bec530 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -532,6 +532,13 @@ struct spi_controller {
+ 
+ #define SPI_MASTER_GPIO_SS		BIT(5)	/* GPIO CS must select slave */
+ 
++	/*
++	 * When this flag is set:
++	 * 1. Do not set SPI_CS_HIGH by default during setup.
++	 * 2. Invert GPIO polarity in the spi_set_cs function when SPI mode is set to SPI_CS_HIGH.
++	 */
++#define SPI_CONTROLLER_ENABLE_CS_GPIOD BIT(9)
++
+ 	/* Flag indicating if the allocation of this struct is devres-managed */
+ 	bool			devm_allocated;
+ 

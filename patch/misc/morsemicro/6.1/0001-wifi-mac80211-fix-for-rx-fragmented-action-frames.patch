@@ -1,0 +1,41 @@
+From 3a15ea9b59f660b7b7352b040d263305ad92a6ac Mon Sep 17 00:00:00 2001
+From: Gilad Itzkovitch <gilad.itzkovitch@morsemicro.com>
+Date: Thu, 24 Nov 2022 13:53:36 +1300
+Subject: [PATCH] wifi: mac80211: Fix for Rx fragmented action frames
+
+The ieee80211_accept_frame() function performs a number of early checks
+to decide whether or not further processing needs to be done on a frame.
+One of those checks is the ieee80211_is_robust_mgmt_frame() function.
+It requires to peek into the frame payload, but because defragmentation
+does not occur until later on in the receive path, this peek is invalid
+for any fragment other than the first one. Also, in this scenario there
+is no STA and so the fragmented frame will be dropped later on in the
+process and will not reach the upper stack. This can happen with large
+action frames at low rates, for example, we see issues with DPP on S1G.
+
+This change will only check if the frame is robust if it's the first
+fragment. Invalid fragmented packets will be discarded later after
+defragmentation is completed.
+
+Signed-off-by: Gilad Itzkovitch <gilad.itzkovitch@morsemicro.com>
+Link: https://lore.kernel.org/r/20221124005336.1618411-1-gilad.itzkovitch@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+(cherry picked from commit e6f5dcb7ec9badd9500f64b087f7243c37300d63)
+---
+ net/mac80211/rx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/net/mac80211/rx.c b/net/mac80211/rx.c
+index 44e407e1a14c7..c7d9834fed1c7 100644
+--- a/net/mac80211/rx.c
++++ b/net/mac80211/rx.c
+@@ -4258,7 +4258,8 @@ static bool ieee80211_accept_frame(struct ieee80211_rx_data *rx)
+ 	case NL80211_IFTYPE_STATION:
+ 		if (!bssid && !sdata->u.mgd.use_4addr)
+ 			return false;
+-		if (ieee80211_is_robust_mgmt_frame(skb) && !rx->sta)
++		if (ieee80211_is_first_frag(hdr->seq_ctrl) &&
++		    ieee80211_is_robust_mgmt_frame(skb) && !rx->sta)
+ 			return false;
+ 		if (multicast)
+ 			return true;

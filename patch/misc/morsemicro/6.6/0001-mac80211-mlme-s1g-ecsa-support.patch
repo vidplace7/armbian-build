@@ -1,0 +1,29 @@
+From 77cd2d08f1cec39e3c8b2fea734772a73ac89ca9 Mon Sep 17 00:00:00 2001
+From: Sagar Bussa <sagar.bussa@morsemicro.com>
+Date: Thu, 27 Apr 2017 12:45:38 +0530
+Subject: [PATCH] mac80211: mlme s1g ecsa support
+
+Update the STA-side MLME to consider short beacons in channel switch
+time calculations, which effectively considers the time based on DTIM
+beacon intervals, as ECSA IE is advertised in DTIM beacons.
+
+This patch is S1G specific and can have an impact on ECSA functionality
+of other Wi-Fi radios, which delays channel switch operation based on
+DTIM interval.
+---
+ net/mac80211/mlme.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/net/mac80211/mlme.c b/net/mac80211/mlme.c
+index cf01f1f298a3b..79d2c77d14d0f 100644
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -1992,7 +1992,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
+ 	}
+ 
+ 	/* channel switch handled in software */
+-	timeout = TU_TO_JIFFIES((max_t(int, csa_ie.count, 1) - 1) *
++	timeout = TU_TO_JIFFIES((max_t(int, csa_ie.count, 1) - 1) * sdata->vif.bss_conf.dtim_period *
+ 				cbss->beacon_interval);
+ 	wiphy_delayed_work_queue(local->hw.wiphy,
+ 				 &link->u.mgd.chswitch_work,

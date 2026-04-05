@@ -1,0 +1,55 @@
+From 130a839540f9dd8a3a0c640aa6963ae0d482ba95 Mon Sep 17 00:00:00 2001
+From: Nev Young <neville.young@morsemicro.com>
+Date: Mon, 10 Mar 2025 19:29:11 +1100
+Subject: [PATCH] mmc: sdio 1.8v support quirk
+
+MM610x chips do not support the 1.8V bus switch despite advertising
+support when queried by SDIO 3.0 host devices. Introduce a quirk for
+disabling 1.8V bus switching and register this quirk with MM610x
+devices.
+---
+ drivers/mmc/core/quirks.h | 4 ++++
+ drivers/mmc/core/sdio.c   | 2 +-
+ include/linux/mmc/card.h  | 1 +
+ 3 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/core/quirks.h b/drivers/mmc/core/quirks.h
+index 89b512905be14..fd6402036a55c 100644
+--- a/drivers/mmc/core/quirks.h
++++ b/drivers/mmc/core/quirks.h
+@@ -196,6 +196,10 @@ static const struct mmc_fixup __maybe_unused sdio_card_init_methods[] = {
+ 			      MMC_QUIRK_BROKEN_BYTE_MODE_512 |
+ 			      MMC_QUIRK_LENIENT_FN0 |
+ 			      MMC_QUIRK_BLKSZ_FOR_BYTE_MODE),
++	
++	SDIO_FIXUP_COMPATIBLE("morse,mm6104", add_quirk, MMC_QUIRK_NO_18V),
++
++	SDIO_FIXUP_COMPATIBLE("morse,mm610x", add_quirk, MMC_QUIRK_NO_18V),
+ 
+ 	END_FIXUP
+ };
+diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
+index 4b19b8a16b096..cf893f6908f21 100644
+--- a/drivers/mmc/core/sdio.c
++++ b/drivers/mmc/core/sdio.c
+@@ -739,7 +739,7 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
+ 	 * try to init uhs card. sdio_read_cccr will take over this task
+ 	 * to make sure which speed mode should work.
+ 	 */
+-	if (rocr & ocr & R4_18V_PRESENT) {
++	if ((rocr & ocr & R4_18V_PRESENT)  && !(card->quirks & MMC_QUIRK_NO_18V)) {
+ 		err = mmc_set_uhs_voltage(host, ocr_card);
+ 		if (err == -EAGAIN) {
+ 			mmc_sdio_pre_init(host, ocr_card, card);
+diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+index eb67d3d5ff5b2..bc5b7999a7e0c 100644
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -295,6 +295,7 @@ struct mmc_card {
+ #define MMC_QUIRK_BROKEN_SD_CACHE	(1<<15)	/* Disable broken SD cache support */
+ #define MMC_QUIRK_BROKEN_CACHE_FLUSH	(1<<16)	/* Don't flush cache until the write has occurred */
+ #define MMC_QUIRK_BROKEN_SD_POWEROFF_NOTIFY	(1<<17) /* Disable broken SD poweroff notify support */
++#define MMC_QUIRK_NO_18V   (1<<18)     /* Ignore voltage negotiation and don't use 1.8v */
+ 
+ 	bool			written_flag;	/* Indicates eMMC has been written since power on */
+ 	bool			reenable_cmdq;	/* Re-enable Command Queue */
