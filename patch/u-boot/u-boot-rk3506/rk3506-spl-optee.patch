@@ -1,0 +1,137 @@
+From b9ec0984f53d8f319cd7c2dbd020662b2297d424 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Wed, 5 Feb 2025 01:24:07 +0000
+Subject: [PATCH] WIP: rockchip: rk3506: Enable use of SPL_OPTEE_IMAGE
+
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+Modified-by: Austin Lane <vidplace7@gmail.com>
+---
+ arch/arm/dts/rk3506-u-boot.dtsi | 21 +++++++++++++++++++++
+ arch/arm/mach-rockchip/Kconfig  |  8 ++++++++
+ arch/arm/mach-rockchip/sdram.c  |  5 ++++-
+ include/configs/rk3506_common.h |  1 +
+ 4 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/rk3506-u-boot.dtsi b/arch/arm/dts/rk3506-u-boot.dtsi
+index dfc384b47be..262d0edf844 100644
+--- a/arch/arm/dts/rk3506-u-boot.dtsi
++++ b/arch/arm/dts/rk3506-u-boot.dtsi
+@@ -24,6 +30,17 @@
+ 	bootph-all;
+ };
+ 
++#ifdef CONFIG_SPL_OPTEE_IMAGE
++&fit_template {
++	images {
++		op-tee {
++			load = <0x1000>;
++			entry = <0x1000>;
++		};
++	};
++};
++#endif
++
+ &grf_pmu {
+ 	bootph-all;
+ };
+@@ -40,6 +57,10 @@
+ 	bootph-all;
+ };
+ 
++&otp {
++	bootph-some-ram;
++};
++
+ &pcfg_pull_none {
+ 	bootph-all;
+ };
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index 305114820d7..92ffb937d67 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -331,6 +331,8 @@ config ROCKCHIP_RK3506
+ 	select BOARD_LATE_INIT
+ 	select DM_REGULATOR_FIXED
+ 	select DM_RESET
++	select SPL_OPTEE_IMAGE if SPL_FIT
++	imply ARM_SMCCC if SPL_OPTEE_IMAGE
+ 	imply BOOTSTD_FULL
+ 	imply DM_RNG
+ 	imply ENV_RELOC_GD_ENV_ADDR
+@@ -356,6 +359,7 @@ config ROCKCHIP_RK3506
+ 	imply SPL_SYSCON
+ 	imply SYS_ARCH_TIMER
+ 	imply SYSRESET
++	imply SYSRESET_PSCI if SPL_OPTEE_IMAGE
+ 	help
+ 	  The Rockchip RK3506 is a ARM-based SoC with a tri-core Cortex-A7.
+ 
+@@ -800,6 +804,7 @@ if ROCKCHIP_COMMON_STACK_ADDR && SPL_SHARES_INIT_SP_ADDR
+ config CUSTOM_SYS_INIT_SP_ADDR
+ 	default 0x63f00000 if SPL_TEXT_BASE = 0x60000000
+ 	default 0x43f00000 if SPL_TEXT_BASE = 0x40000000
++	default 0x03f00000 if SPL_TEXT_BASE = 0x00080000
+ 	default 0x03f00000 if SPL_TEXT_BASE = 0x00000000
+ 
+ config SYS_MALLOC_F_LEN
+@@ -821,12 +826,14 @@ config TEXT_BASE
+ 	default 0x60800000 if SPL_TEXT_BASE = 0x60000000
+ 	default 0x40800000 if SPL_TEXT_BASE = 0x40000000
+ 	default 0x00800000 if SPL_TEXT_BASE = 0x00000000
++	default 0x00100000 if SPL_TEXT_BASE = 0x00080000
+ 
+ config SPL_TEXT_BASE
+ 	default 0x60000000 if ROCKCHIP_RK3036 || ROCKCHIP_RK3066 || \
+ 			      ROCKCHIP_RK3128 || ROCKCHIP_RK3188 || \
+ 			      ROCKCHIP_RK322X || ROCKCHIP_RV1108
+ 	default 0x40000000 if ROCKCHIP_RK3576
++	default 0x00080000 if ROCKCHIP_RK3506
+ 	default 0x00000000
+ 
+ config SPL_HAS_BSS_LINKER_SECTION
+@@ -835,6 +842,7 @@ config SPL_HAS_BSS_LINKER_SECTION
+ config SPL_BSS_START_ADDR
+ 	default 0x63f80000 if SPL_TEXT_BASE = 0x60000000
+ 	default 0x43f80000 if SPL_TEXT_BASE = 0x40000000
++	default 0x03f80000 if SPL_TEXT_BASE = 0x00080000
+ 	default 0x03f80000 if SPL_TEXT_BASE = 0x00000000
+ 
+ config SPL_BSS_MAX_SIZE
+diff --git a/arch/arm/mach-rockchip/sdram.c b/arch/arm/mach-rockchip/sdram.c
+index ea0e3621af7..326793a2580 100644
+--- a/arch/arm/mach-rockchip/sdram.c
++++ b/arch/arm/mach-rockchip/sdram.c
+@@ -320,7 +320,7 @@ int dram_init_banksize(void)
+ 		gd->bd->bi_dram[0].size = ram_top - gd->bd->bi_dram[0].start;
+ 	}
+ #else
+-#ifdef CONFIG_SPL_OPTEE_IMAGE
++#if defined(CONFIG_SPL_OPTEE_IMAGE) && !defined(CFG_SYS_SDRAM_RESERVE)
+ 	struct tos_parameter_t *tos_parameter;
+ 
+ 	tos_parameter = (struct tos_parameter_t *)(CFG_SYS_SDRAM_BASE +
+@@ -343,6 +343,9 @@ int dram_init_banksize(void)
+ 	}
+ #else
+ 	gd->bd->bi_dram[0].start = CFG_SYS_SDRAM_BASE;
++#ifdef CFG_SYS_SDRAM_RESERVE
++	gd->bd->bi_dram[0].start += CFG_SYS_SDRAM_RESERVE;
++#endif
+ 	gd->bd->bi_dram[0].size = top - gd->bd->bi_dram[0].start;
+ #endif
+ #endif
+diff --git a/include/configs/rk3506_common.h b/include/configs/rk3506_common.h
+index 5e4ef67289f..c008fee8211 100644
+--- a/include/configs/rk3506_common.h
++++ b/include/configs/rk3506_common.h
+@@ -11,6 +11,7 @@
+ #define CFG_IRAM_BASE			0xfff80000
+ 
+ #define CFG_SYS_SDRAM_BASE		0
++#define CFG_SYS_SDRAM_RESERVE		SZ_1M
+ #define SDRAM_MAX_SIZE			0xc0000000
+ 
+ #ifndef ROCKCHIP_DEVICE_SETTINGS
+-- 
+GitLab
+
