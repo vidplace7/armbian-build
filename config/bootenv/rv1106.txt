@@ -1,0 +1,4 @@
+verbosity=1
+bootlogo=false
+boot_overlay_mode=armbianEnv
+extraargs=cma=0 video=off udev.children-max=1 coherent_pool=2M
