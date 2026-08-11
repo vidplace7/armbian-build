@@ -1,0 +1,11 @@
+# Lilygo K230
+BOARD_NAME="LilyGo T-Display K230"
+BOARD_VENDOR="lilygo"
+BOARDFAMILY="kendryte-k230"
+BOARD_MAINTAINER="vidplace7"
+INTRODUCED="2026"
+KERNEL_TARGET="edge"
+>>BOOT_FDT_FILE="allwinner/sun20i-d1-nezha.dtb"
+SRC_EXTLINUX="yes"
+SRC_CMDLINE="console=ttyS0,115200n8 console=tty0 earlycon=sbi cma=96M rootflags=data=writeback stmmaceth=chain_mode:1 rw"
+BOOTCONFIG="k230_canmv_defconfig"
