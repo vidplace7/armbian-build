@@ -1,0 +1,224 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Simon Glass <sjg@chromium.org>
+Date: Tue, 7 Jul 2026 09:31:12 -0600
+Subject: luckfox-pico: Add the initial support
+
+Add the initial support for the Luckfox Pico Mini B board, which uses
+the RV1103 with 64MB of in-package DDR2 and a 128MB Winbond SPI NAND.
+
+The board boots from the SPI NAND, or over USB in maskrom mode using
+the u-boot-rockchip-usb471/usb472 images, in which case U-Boot runs
+entirely from RAM. The console is on UART2 at 115200 baud
+
+Signed-off-by: Simon Glass <sjg@chromium.org>
+---
+ board/luckfox/pico/MAINTAINERS     |  6 +
+ board/luckfox/pico/Makefile        |  7 +
+ board/luckfox/pico/pico.c          | 19 +++
+ board/luckfox/pico/pico.env        |  4 +
+ doc/board/index.rst                |  1 +
+ doc/board/luckfox/index.rst        |  9 ++
+ doc/board/luckfox/luckfox-pico.rst | 71 ++++++++++
+ doc/board/rockchip/rockchip.rst    |  4 +
+ include/configs/luckfox_pico.h     | 11 ++
+ 9 files changed, 132 insertions(+)
+
+diff --git a/board/luckfox/pico/MAINTAINERS b/board/luckfox/pico/MAINTAINERS
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/board/luckfox/pico/MAINTAINERS
+@@ -0,0 +1,6 @@
++LUCKFOX PICO
++M:	Simon Glass <sjg@chromium.org>
++S:	Maintained
++F:	board/luckfox/pico
++F:	include/configs/luckfox_pico.h
++F:	configs/luckfox-pico-mini-b-rv1103_defconfig
+diff --git a/board/luckfox/pico/Makefile b/board/luckfox/pico/Makefile
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/board/luckfox/pico/Makefile
+@@ -0,0 +1,7 @@
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++# Copyright 2026 Simon Glass <sjg@chromium.org>
++#
++
++obj-y	+= pico.o
+diff --git a/board/luckfox/pico/pico.c b/board/luckfox/pico/pico.c
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/board/luckfox/pico/pico.c
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// Copyright 2026 Simon Glass <sjg@chromium.org>
++
++#include <asm/global_data.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++int dram_init(void)
++{
++	gd->ram_size = SZ_64M;
++
++	return 0;
++}
++
++phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
++{
++	return gd->ram_top;
++}
+diff --git a/board/luckfox/pico/pico.env b/board/luckfox/pico/pico.env
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/board/luckfox/pico/pico.env
+@@ -0,0 +1,4 @@
++kernel_addr_r=0x00800000
++fdt_addr_r=0x02000000
++ramdisk_addr_r=0x03000000
++bootargs=console=ttyS2,115200 mtdparts=spi0.0:256K(env),1M@256K(idblock),1M(uboot),8M(boot),-(ubi) ro rootwait ubi.mtd=ubi ubi.block=0,rootfs root=/dev/ubiblock0_0 rootfstype=squashfs
+diff --git a/doc/board/index.rst b/doc/board/index.rst
+index 111111111111..222222222222 100644
+--- a/doc/board/index.rst
++++ b/doc/board/index.rst
+@@ -38,6 +38,7 @@ Board-specific doc
+    kontron/index
+    lenovo/index
+    lg/index
++   luckfox/index
+    liebherr/index
+    mediatek/index
+    microchip/index
+diff --git a/doc/board/luckfox/index.rst b/doc/board/luckfox/index.rst
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/doc/board/luckfox/index.rst
+@@ -0,0 +1,9 @@
++.. SPDX-License-Identifier: GPL-2.0+
++
++Luckfox
++=======
++
++.. toctree::
++   :maxdepth: 2
++
++   luckfox-pico
+diff --git a/doc/board/luckfox/luckfox-pico.rst b/doc/board/luckfox/luckfox-pico.rst
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/doc/board/luckfox/luckfox-pico.rst
+@@ -0,0 +1,71 @@
++.. SPDX-License-Identifier: GPL-2.0+
++
++Luckfox Pico boards
++===================
++
++U-Boot for the Luckfox Pico series of RV1103/RV1106 boards. Only the
++Pico Mini B (RV1103, 64MB DDR2, 128MB SPI NAND) is supported so far.
++
++Quick Start
++-----------
++
++- Get the DDR initialization binary
++- Build U-Boot
++- Boot the board over USB, or flash U-Boot into the SPI NAND
++
++Get the DDR initialization binary
++---------------------------------
++
++.. code-block:: bash
++
++   $ git clone https://github.com/rockchip-linux/rkbin.git
++
++The DDR initialization binary is at rkbin/bin/rv11/rv1106_ddr_924MHz_v1.15.bin
++and covers both the RV1103 and the RV1106.
++
++Build U-Boot
++------------
++
++.. code-block:: bash
++
++   $ export CROSS_COMPILE=arm-linux-gnueabihf-
++   $ export ROCKCHIP_TPL=<path-to-rkbin>/bin/rv11/rv1106_ddr_924MHz_v1.15.bin
++   $ make luckfox-pico-mini-b-rv1103_defconfig
++   $ make
++
++This produces idbloader.img and u-boot.img for flashing to the SPI
++NAND, plus u-boot-rockchip-usb471.bin and u-boot-rockchip-usb472.bin
++for booting over USB.
++
++Boot over USB (maskrom mode)
++----------------------------
++
++Hold the BOOT button while applying power (or leave the boot media
++blank) and the BootROM enters maskrom mode on the USB OTG port,
++appearing as USB ID 2207:110c. U-Boot then runs entirely from RAM;
++nothing is written to the flash.
++
++Send the two images with a maskrom download tool such as rockusb or
++rkdeveloptool (note that the loader format parser in older
++rkdeveloptool versions is not needed here, since these are raw
++images):
++
++.. code-block:: bash
++
++   $ rockusb download-boot u-boot-rockchip-usb471.bin u-boot-rockchip-usb472.bin
++
++Flash U-Boot into the SPI NAND
++------------------------------
++
++Enter maskrom mode as above, then use a loader from rkbin to run the
++Rockchip usbplug and write the images:
++
++.. code-block:: bash
++
++   $ cd <path-to-rkbin>
++   $ ./tools/boot_merger RKBOOT/RV1106MINIALL.ini
++   $ ./tools/upgrade_tool db rv1106_download_*.bin
++   $ ./tools/upgrade_tool wl 0x200 idbloader.img
++   $ ./tools/upgrade_tool wl 0xa00 u-boot.img
++
++Power cycle the board and U-Boot output appears on UART2 (115200,8N1).
+diff --git a/doc/board/rockchip/rockchip.rst b/doc/board/rockchip/rockchip.rst
+index 111111111111..222222222222 100644
+--- a/doc/board/rockchip/rockchip.rst
++++ b/doc/board/rockchip/rockchip.rst
+@@ -180,6 +180,10 @@ List of mainline supported Rockchip boards:
+      - Yanyi Tech CoolPi CM5 EVB (coolpi-cm5-evb-rk3588)
+      - Yanyi Tech CoolPi CM5 GenBook (coolpi-cm5-genbook-rk3588)
+ 
++* rv1103
++     - Luckfox Pico Mini B (luckfox-pico-mini-b-rv1103), see
++       :doc:`../luckfox/luckfox-pico`
++
+ * rv1103b
+      - Onion Omega4 (omega4-rv1103b), see :doc:`../onion/omega4-rv1103b`
+ 
+diff --git a/include/configs/luckfox_pico.h b/include/configs/luckfox_pico.h
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/include/configs/luckfox_pico.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright 2026 Simon Glass <sjg@chromium.org>
++ */
++
++#ifndef __CONFIG_H
++#define __CONFIG_H
++
++#include <configs/rv1106_common.h>
++
++#endif
+-- 
+Armbian
+

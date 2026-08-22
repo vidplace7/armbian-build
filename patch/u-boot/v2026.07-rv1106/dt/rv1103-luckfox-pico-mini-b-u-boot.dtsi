@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0+
+// (C) Copyright 2026 Simon Glass <sjg@chromium.org>
+
+#include "rockchip-u-boot.dtsi"
+
+/ {
+	chosen {
+		u-boot,spl-boot-order = &spi_nand;
+	};
+};
