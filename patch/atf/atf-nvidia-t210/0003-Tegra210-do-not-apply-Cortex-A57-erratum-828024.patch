@@ -1,0 +1,58 @@
+From 93cb369793c043c9db66963f15760e01d09cef55 Mon Sep 17 00:00:00 2001
+From: mojyack <mojyack@gmail.com>
+Date: Thu, 17 Sep 2026 17:37:35 +0900
+Subject: [PATCH 3/3] Tegra210: do not apply Cortex-A57 erratum 828024
+
+Erratum 828024's workaround ("TLB maintenance operations might not be
+synchronized by DSB instruction", ARM-EPM-049219 v23) sets CPUACTLR_EL1[49]
+and [28:25], which disables the A57's write-streaming (no-allocate) mode.
+The errata notice scopes the erratum to "multi-cluster systems that utilize
+distributed virtual memory (DVM) transactions" - the four T210 A57s are one
+cluster, and the A53 cluster is never coherent with them - and it warns that
+disabling write streaming "will have an adverse effect on the performance of
+memset and memcpy operations".
+
+It does, by a factor of three. Measured on a Nintendo Switch (HAC-001),
+upstream Linux 7.3, tinymembench 0.4.9, one binary, DRAM-sized buffers:
+
+                     with 828024   without
+  standard memset      3524 MB/s    10666
+  standard memcpy      2275          3941
+  NEON STP fill        3523         10673
+  random read 32 MiB    167.0 ns      166.7
+
+Every full-line store was taking a linefill it did not need: the CPU PMU
+counts l2d_cache_refill 1.01 and bus_access 7.83 per 64-byte line written
+with the workaround, 0.00 and 3.99 without, and that holds for DC ZVA too,
+which reads nothing by definition.
+
+NVIDIA's own shipped R32.7.6 monitor does not apply this workaround on T210
+either - disassembling tos-mon-only.img shows its CPUACTLR_EL1 sequences set
+only bits 24, 38, 52, 54, 55 and 59, which is exactly what this build now
+leaves behind. A soak of streaming stores racing mprotect()/munmap() of the
+same pages (83429 rounds x 8 MiB, four threads) reports no mismatches.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XS1cX3ePWUM32XJki7eLiV
+---
+ plat/nvidia/tegra/soc/t210/platform_t210.mk | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/plat/nvidia/tegra/soc/t210/platform_t210.mk b/plat/nvidia/tegra/soc/t210/platform_t210.mk
+index 724cfc3..3077159 100644
+--- a/plat/nvidia/tegra/soc/t210/platform_t210.mk
++++ b/plat/nvidia/tegra/soc/t210/platform_t210.mk
+@@ -46,8 +46,9 @@ BL31_SOURCES		+=	${TEGRA_GICv2_SOURCES}				\
+ A57_DISABLE_NON_TEMPORAL_HINT	:=	1
+ ERRATA_A57_826974		:=	1
+ ERRATA_A57_826977		:=	1
+-ERRATA_A57_828024		:=	1
+ ERRATA_A57_833471		:=	1
++# 828024 is deliberately not applied: it disables write streaming.
++ERRATA_A57_828024		:=	0
+ 
+ # Enable workarounds for selected Cortex-A53 erratas.
+ A53_DISABLE_NON_TEMPORAL_HINT	:=	1
+-- 
+2.56.0
+

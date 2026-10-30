@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Armbian <info@armbian.com>
+Date: Fri, 31 Oct 2026 00:00:00 +0000
+Subject: [PATCH] nintendo-switch: boot the hekate L4T partition
+
+hekate's installer marks no partition bootable. "bootflow scan" then looks at
+partition 1 only, which is hekate's FAT32, so it never reaches
+/boot/extlinux/extlinux.conf on the rootfs. hekate always puts L4T Linux on
+partition 2. Try that partition by name first. Keep the scan as the fallback
+for a card partitioned by hand.
+---
+--- a/configs/nintendo-switch_defconfig
++++ b/configs/nintendo-switch_defconfig
+@@ -22,6 +22,7 @@
+ CONFIG_SYS_PBSIZE=2089
+ CONFIG_SYS_PROMPT="Nintendo Switch # "
+ CONFIG_BOOTDELAY=1
++CONFIG_BOOTCOMMAND="sysboot mmc 1:2 any ${scriptaddr} /boot/extlinux/extlinux.conf; bootflow scan"
+ # CONFIG_BOOTM_PLAN9 is not set
+ # CONFIG_BOOTM_RTEMS is not set
+ # CONFIG_BOOTM_VXWORKS is not set
+-- 
+2.43.0
+

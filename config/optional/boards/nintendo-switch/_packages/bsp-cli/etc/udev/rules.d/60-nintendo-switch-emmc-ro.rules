@@ -1,0 +1,4 @@
+# Horizon's eMMC holds PRODINFO, the console's unique keys. A write can brick it.
+# Linux runs from the SD card. Match the controller: the mmcblk number can change.
+# To write it on purpose, run as root: echo 0 > /sys/block/mmcblkN/force_ro
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", KERNELS=="700b0600.mmc", ATTR{force_ro}="1"

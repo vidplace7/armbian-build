@@ -1,0 +1,67 @@
+From 93904a605e9a6ac1a44ed7306a114fd5525eed40 Mon Sep 17 00:00:00 2001
+From: mojyack <mojyack@gmail.com>
+Date: Fri, 14 Aug 2026 10:54:33 +0900
+Subject: [PATCH 2/3] Tegra210: invalidate the r2p payload after SC7
+
+Rebooting after a deep sleep killed the board: no output from anything,
+no hekate, no bootloader, and only holding the power button for twelve
+seconds brought it back.
+
+The reboot-to-payload staging area sits in IRAM at TEGRA_IRAM_BASE +
+TEGRA_IRAM_A_SIZE, and IRAM does not survive SC7 - the warmboot path
+leaves its own data there on the way back up. That data is not a
+payload, but it is not zero either, and zero is the only thing
+r2p_ensure_payload_exists() tests for. So it concludes a payload is
+already staged, skips copying the default one in from TZDRAM, and
+tegra_pmc_system_reset() restarts straight into whatever the warmboot
+left behind.
+
+Clear the entry OP on SC7 exit, exactly as plat_late_platform_setup()
+already does on cold boot. Any payload a caller had staged before
+suspending was destroyed by the warmboot regardless, so there is nothing
+to preserve.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017fdordhuaYe3SNiccSSKBW
+---
+ plat/nvidia/tegra/soc/t210/plat_psci_handlers.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/plat/nvidia/tegra/soc/t210/plat_psci_handlers.c b/plat/nvidia/tegra/soc/t210/plat_psci_handlers.c
+index 58c1abd..fd74ba7 100644
+--- a/plat/nvidia/tegra/soc/t210/plat_psci_handlers.c
++++ b/plat/nvidia/tegra/soc/t210/plat_psci_handlers.c
+@@ -484,6 +484,7 @@ int32_t tegra_soc_pwr_domain_suspend_pwrdown_early(const psci_power_state_t *tar
+ int tegra_soc_pwr_domain_on_finish(const psci_power_state_t *target_state)
+ {
+ 	const plat_params_from_bl2_t *plat_params = bl31_get_plat_params();
++	uint32_t *iram_entry_op = (uint32_t *)(TEGRA_IRAM_BASE + TEGRA_IRAM_A_SIZE);
+ 	uint32_t cfg;
+ 	uint32_t val, entrypoint = 0;
+ 
+@@ -501,6 +502,22 @@ int tegra_soc_pwr_domain_on_finish(const psci_power_state_t *target_state)
+ 	if (target_state->pwr_domain_state[PLAT_MAX_PWR_LVL] ==
+ 			PLAT_SYS_SUSPEND_STATE_ID) {
+ 
++		/*
++		 * The reboot-to-payload staging area sits in IRAM, which does
++		 * not survive SC7 - the warmboot path leaves its own data
++		 * there. That data is not a payload, but it is not zero
++		 * either, so the emptiness test in r2p_ensure_payload_exists()
++		 * takes it for one, skips restoring the default payload, and
++		 * the next reboot resets straight into it. The board then dies
++		 * with no output at all and only a hard power cycle recovers
++		 * it. Invalidate the entry OP exactly as
++		 * plat_late_platform_setup() does on cold boot, so the payload
++		 * is copied in from TZDRAM again.
++		 */
++		if (plat_params->r2p_payload_base) {
++			*iram_entry_op = 0;
++		}
++
+ 		/*
+ 		 * Security engine resume
+ 		 */
+-- 
+2.56.0
+
